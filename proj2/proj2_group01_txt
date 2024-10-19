@@ -1,0 +1,80 @@
+Project Write-up: Group 01
+
+Q1. How does a system call execute? Explain the steps from making the call in the user space process to returning from the call with a result.
+
+When a user space process makes a system call, the following steps occur:
+1. System Call Request: The process calls a system function, such as syscall() or write().
+ This sends a request to the kernel to perform an action, like reading from or writing to a file.
+2. Transition to Kernel Mode: The request triggers a transition from user mode to kernel mode,
+ where the system call is handled by the kernel. This is done through a special instruction that generates a trap or interrupt.
+3. System Call Execution: The kernel looks up the system call number in its syscall table to find the corresponding function,
+ then runs the function associated with the system call.
+4. Returning to User Space: After the function executes, the result is passed back to the user space, and control is returned to the user process.
+5. Process Continues: The user space process receives the result of the system call and continues execution with the returned value or error code.
+
+Q2. When does access to data structures in user space need to be synchronized?
+
+Synchronization is needed when multiple threads or processes are accessing the same data structure at the same time.
+If any of them are writing to the data, synchronization is required to avoid race conditions or data corruption.
+This is important in shared memory, files, or data that the kernel accesses on behalf of multiple user processes.
+
+Q3. What synchronization mechanism can be used to access shared kernel data structures safely?
+
+Some common synchronization mechanisms in the kernel include:
+
+1. Hooks (like kprobes): Hooks such as kprobes allow you to safely intercept and modify kernel functions without directly 
+altering kernel code or data. In our case, kprobes enabled us to dynamically hook into the sys_calc system call without 
+modifying the system call table directly. This provides a safe way to control access to kernel functions and ensures that 
+the system call behavior is intercepted without causing race conditions or other synchronization issues.
+
+2. Spinlocks: Used to protect small critical sections in code, 
+especially when you don’t want to sleep while waiting for a lock.
+
+3. Mutexes: Block processes if they can’t acquire the lock, useful when you may need to sleep.
+
+4. Read-Write Locks: Allow multiple readers but only one writer at a time, balancing performance 
+when read operations are more common than writes.
+
+5. Seqlocks: Useful when reads are frequent and writes are rare, allowing fast access for readers 
+and retrying if a write occurs during a read.
+
+6. RCU (Read-Copy-Update): Designed for read-heavy situations, allowing readers to access data without blocking, 
+while writers update the data by creating a copy.
+
+Q4. What are the individual contributions of your group for this project?
+
+Su: Su was responsible for managing deadlines and coordination. Su worked mainly on implementing the mod_calc.c file, ensuring that we 
+correctly used kprobes to hook into the sys_calc system call, and also took charge of debugging the kernel module. Su also handled the 
+git repository for the team.
+
+Martina: Martina focused on researching the kernel hooking methods. She implemented the kprobe-based solution, 
+allowing us to hook the system call without directly modifying the syscall table. She also helped with testing and 
+verifying that the system call behavior was correctly modified.
+
+Manuela: Manuela set up the cross-compilation environment and handled the Makefile and Kbuild setup. 
+She ensured that the module could be successfully compiled for ARM architecture.
+
+Other parts of the project like the user-space application were all done together at the library. 
+
+Q5. What issues have you faced for the project and how did you resolve them?
+
+We encountered several challenges:
+
+1. System Call Table Modification: Initially, we tried directly modifying the syscall table to override sys_calc, but due to 
+kernel protections (like write protection), we couldn’t directly modify the system call table as we planned.
+
+Solution: We switched to using kprobes, which allowed us to hook into the system call dynamically without 
+modifying the syscall table directly. This approach was much safer and avoided write protection issues.
+
+2. Cross-Compilation Setup: We had some challenges setting up the environment for cross-compiling the kernel module for ARM, 
+as the Makefile and build process weren’t initially configured correctly.
+
+Solution: Manuela reworked the Makefile and Kbuild to ensure proper cross-compilation, allowing us to build the 
+module for the Raspberry Pi’s ARM architecture.
+
+3. Debugging System Call Behavior: It took some time to get the hooked system call (sys_calc) working as expected, as we had 
+to track the kprobe registration and ensure it was handling the system call correctly.
+
+Solution: We used printk extensively for debugging and observed the kernel logs with dmesg to trace the system call flow. 
+This helped us pinpoint where things were going wrong and fix them.
+
