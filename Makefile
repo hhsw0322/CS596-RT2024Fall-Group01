@@ -559,7 +559,7 @@ init-y		:= init/
 drivers-y	:= drivers/ sound/ firmware/
 net-y		:= net/
 libs-y		:= lib/
-core-y		:= usr/
+core-y		:= usr/ 
 virt-y		:= virt/
 endif # KBUILD_EXTMOD
 
@@ -917,7 +917,7 @@ export mod_sign_cmd
 
 
 ifeq ($(KBUILD_EXTMOD),)
-core-y		+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/ proj2/kernel/
+core-y		+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/ proj2/kernel/ proj3/kernel/
 
 vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
@@ -1708,3 +1708,7 @@ FORCE:
 # Declare the contents of the .PHONY variable as phony.  We keep that
 # information in a variable so we can use it in if_changed and friends.
 .PHONY: $(PHONY)
+
+clean:
+	find . -type f | xargs touch
+	rm -rf $(OBJS)

@@ -340,6 +340,9 @@ asmlinkage long sys_init_module(void __user *umod, unsigned long len,
 				const char __user *uargs);
 asmlinkage long sys_delete_module(const char __user *name_user,
 				unsigned int flags);
+asmlinkage long sys_set_rsv(pid_t pid, struct timespec *C, struct timespec *T);
+asmlinkage long sys_cancel_rsv(pid_t pid);
+/* project 3 until here from sys_set_rsv */
 
 #ifdef CONFIG_OLD_SIGSUSPEND
 asmlinkage long sys_sigsuspend(old_sigset_t mask);

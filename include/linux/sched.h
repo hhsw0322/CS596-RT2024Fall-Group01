@@ -1481,6 +1481,12 @@ struct tlbflush_unmap_batch {
 	 */
 	bool writable;
 };
+//PROJ 3 Add the reservation info structure before the task_struct definition
+struct rsv_info {
+    struct timespec C;
+    struct timespec T;
+    bool active;
+};
 
 struct task_struct {
 #ifdef CONFIG_THREAD_INFO_IN_TASK
@@ -1970,6 +1976,11 @@ struct task_struct {
 	/* A live task holds one reference. */
 	atomic_t stack_refcount;
 #endif
+/*What we added for project 3 */
+	struct timespec rsv_period;  /* Reservation period (T) */
+	bool rsv_set; /* Is reservation set */
+	struct timespec rsv_budget;  // Reservation budget (C) */
+/* until here */
 /* CPU-specific state of this task */
 	struct thread_struct thread;
 /*
