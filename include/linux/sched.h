@@ -5,6 +5,8 @@
 
 #include <linux/sched/prio.h>
 
+/* added for 4.2, Function prototype for setting real-time priorities based on RM Scheduling */
+void compute_and_set_priorities(void);
 
 struct sched_param {
 	int sched_priority;
@@ -1973,7 +1975,8 @@ struct task_struct {
 /*What we added for project 3 */
 	struct timespec rsv_period;  /* Reservation period (T) */
 	bool rsv_set; /* Is reservation set */
-	struct timespec rsv_budget;  // Reservation budget (C) */
+	struct timespec rsv_budget;  /* Reservation budget (C) */
+	struct timespec rsv_consumed; /*Accumulator for computation time */
 /* until here */
 /* CPU-specific state of this task */
 	struct thread_struct thread;

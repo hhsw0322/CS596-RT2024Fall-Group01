@@ -342,6 +342,7 @@ asmlinkage long sys_delete_module(const char __user *name_user,
 				unsigned int flags);
 asmlinkage long sys_set_rsv(pid_t pid, struct timespec *C, struct timespec *T);
 asmlinkage long sys_cancel_rsv(pid_t pid);
+asmlinkage long sys_wait_until_next_period(void);
 /* project 3 until here from sys_set_rsv */
 
 #ifdef CONFIG_OLD_SIGSUSPEND

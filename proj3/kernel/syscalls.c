@@ -2,6 +2,37 @@
 #include <linux/syscalls.h>
 #include <linux/sched.h>
 #include <linux/uaccess.h>
+#include <linux/spinlock.h>
+#include <linux/list.h>
+#include <linux/slab.h>
+#include <linux/hrtimer.h>
+#include <linux/signal.h>
+
+/*
+ * Data structure for managing tasks with reservations.
+ */
+static LIST_HEAD(rsv_task_list); // List of tasks with reservations
+static DEFINE_SPINLOCK(rsv_lock); // Lock for reservation management
+
+struct rsv_task_info {
+    struct task_struct *task;
+    struct timespec period;
+    struct timespec consumed_time;
+    struct hrtimer period_timer;
+    struct list_head list;
+};
+
+/*
+ * High-resolution timer callback for task periods.
+ */
+static enum hrtimer_restart period_timer_callback(struct hrtimer *timer) {
+    struct rsv_task_info *info = container_of(timer, struct rsv_task_info, period_timer);
+    info->consumed_time.tv_sec = 0;
+    info->consumed_time.tv_nsec = 0; // Reset consumed time
+    wake_up_process(info->task); // Wake up the task for its next period
+    hrtimer_forward_now(timer, timespec_to_ktime(info->period)); // Restart timer
+    return HRTIMER_RESTART;
+}
 
 /*
  * System call to set a reservation for a given task.
@@ -9,83 +40,127 @@
 asmlinkage long sys_set_rsv(pid_t pid, struct timespec __user *C, struct timespec __user *T) {
     struct task_struct *task;
     struct timespec c_val, t_val;
+    struct rsv_task_info *new_rsv_info;
 
-    // Copy C and T values from user space to kernel space
     if (copy_from_user(&c_val, C, sizeof(struct timespec)) ||
         copy_from_user(&t_val, T, sizeof(struct timespec))) {
-        return -EFAULT; // Error copying from user
+        return -EFAULT;
     }
 
-    // Validate input arguments (C and T must be non-negative)
     if (c_val.tv_sec < 0 || c_val.tv_nsec < 0 || t_val.tv_sec < 0 || t_val.tv_nsec < 0) {
-        return -EINVAL; // Invalid input
+        return -EINVAL;
     }
 
-    // Find the task by PID
     if (pid == 0) {
-        task = current; // Apply to calling task
+        task = current;
     } else {
         rcu_read_lock();
         task = find_task_by_vpid(pid);
         if (!task) {
             rcu_read_unlock();
-            return -ESRCH; // No such process
+            return -ESRCH;
         }
         get_task_struct(task);
         rcu_read_unlock();
     }
 
-    // Check if the task already has a reservation
     if (task->rsv_set) {
         put_task_struct(task);
-        return -EBUSY; // Reservation already exists
+        return -EBUSY;
     }
 
-    // Set reservation values
+    spin_lock(&rsv_lock);
+
+    new_rsv_info = kmalloc(sizeof(*new_rsv_info), GFP_KERNEL);
+    if (!new_rsv_info) {
+        spin_unlock(&rsv_lock);
+        put_task_struct(task);
+        return -ENOMEM;
+    }
+
+    new_rsv_info->task = task;
+    new_rsv_info->period = t_val;
+    new_rsv_info->consumed_time.tv_sec = 0;
+    new_rsv_info->consumed_time.tv_nsec = 0;
+
+    hrtimer_init(&new_rsv_info->period_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+    new_rsv_info->period_timer.function = &period_timer_callback;
+    list_add(&new_rsv_info->list, &rsv_task_list);
+
     task->rsv_budget = c_val;
     task->rsv_period = t_val;
     task->rsv_set = true;
 
-    // Log a message to the kernel
-    printk(KERN_INFO "Reservation set for task %d: Budget (%ld sec, %ld nsec), Period (%ld sec, %ld nsec)\n",
-           task->pid, c_val.tv_sec, c_val.tv_nsec, t_val.tv_sec, t_val.tv_nsec);
+    hrtimer_start(&new_rsv_info->period_timer, timespec_to_ktime(t_val), HRTIMER_MODE_REL);
+
+    spin_unlock(&rsv_lock);
+
+    printk(KERN_ALERT "Reservation set for task %d\n", task->pid);
 
     put_task_struct(task);
-    return 0; // Success
+    return 0;
 }
 
 /*
- * System call to cancel a reservation for a given task.
+ * System call to wait until the next period.
+ */
+asmlinkage long sys_wait_until_next_period(void) {
+    struct task_struct *task = current;
+    struct rsv_task_info *entry;
+
+    spin_lock(&rsv_lock);
+    list_for_each_entry(entry, &rsv_task_list, list) {
+        if (entry->task == task) {
+            set_current_state(TASK_UNINTERRUPTIBLE);
+            spin_unlock(&rsv_lock);
+            schedule();
+            return 0;
+        }
+    }
+    spin_unlock(&rsv_lock);
+    return -EINVAL;
+}
+
+/*
+ * System call to cancel a reservation.
  */
 asmlinkage long sys_cancel_rsv(pid_t pid) {
     struct task_struct *task;
+    struct rsv_task_info *entry, *tmp;
 
-    // Find the task by PID
     if (pid == 0) {
-        task = current; // Apply to calling task
+        task = current;
     } else {
         rcu_read_lock();
         task = find_task_by_vpid(pid);
         if (!task) {
             rcu_read_unlock();
-            return -ESRCH; // No such process
+            return -ESRCH;
         }
         get_task_struct(task);
         rcu_read_unlock();
     }
 
-    // Check if the task has a reservation
     if (!task->rsv_set) {
         put_task_struct(task);
-        return -EINVAL; // No reservation to cancel
+        return -EINVAL;
     }
 
-    // Cancel the reservation
-    task->rsv_set = false;
+    spin_lock(&rsv_lock);
+    list_for_each_entry_safe(entry, tmp, &rsv_task_list, list) {
+        if (entry->task == task) {
+            list_del(&entry->list);
+            kfree(entry);
+            hrtimer_cancel(&entry->period_timer);
 
-    // Log a message to the kernel
-    printk(KERN_INFO "Reservation canceled for task %d\n", task->pid);
-
+            task->rsv_set = false;
+            spin_unlock(&rsv_lock);
+            printk(KERN_ALERT "Reservation canceled for task %d\n", task->pid);
+            put_task_struct(task);
+            return 0;
+        }
+    }
+    spin_unlock(&rsv_lock);
     put_task_struct(task);
-    return 0; // Success
+    return -EINVAL;
 }

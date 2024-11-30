@@ -426,7 +426,7 @@
 /*  #define __NR_calc			(__NR_SYSCALL_BASE+397) used for project 2*/
 #define __NR_set_rsv			(__NR_SYSCALL_BASE + 397)  /* Reuse 397 for set_rsv */
 #define __NR_cancel_rsv			(__NR_SYSCALL_BASE + 398)  /*  Assign 398 for cancel_rsv */
-
+#define __NR_wait_until_next_period	(__NR_SYSCALL_BASE + 399)
 
 
 

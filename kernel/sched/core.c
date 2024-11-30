@@ -2863,6 +2863,14 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	       struct task_struct *next, struct pin_cookie cookie)
 {
 	struct mm_struct *mm, *oldmm;
+	struct timespect current_time, delta_time;
+
+/*Project 3! Step 1: Track time for the current (prev) task before switching out */
+	if (prev->rsv_set) {
+        	getnstimeofday(&current_time);  // Get the current time
+        	delta_time = timespec_sub(current_time, prev->last_switch_time);  // Calculate elapsed time
+        	prev->rsv_consumed = timespec_add(prev->rsv_consumed, delta_time);  // Update consumed time
+    	}
 
 	prepare_task_switch(rq, prev, next);
 
@@ -2899,6 +2907,10 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	switch_to(prev, next, prev);
 	barrier();
 
+//Project 3! Step 2: Set the last switch time for the next (new) task after switching in
+    	if (next->rsv_set) {
+        	getnstimeofday(&next->last_switch_time);  // Reset the last switch time for the new task
+    	}
 	return finish_task_switch(prev);
 }
 
