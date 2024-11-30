@@ -1481,12 +1481,6 @@ struct tlbflush_unmap_batch {
 	 */
 	bool writable;
 };
-//PROJ 3 Add the reservation info structure before the task_struct definition
-struct rsv_info {
-    struct timespec C;
-    struct timespec T;
-    bool active;
-};
 
 struct task_struct {
 #ifdef CONFIG_THREAD_INFO_IN_TASK
