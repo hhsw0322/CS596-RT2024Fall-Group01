@@ -1,0 +1,28 @@
+Project 3 - Write Up
+
+Group Number: 01
+
+Team Members: Htet Hnin Su Wai, Martina Azabo, Manuela Miranda
+
+Q1. Difference Between Concurrent Execution and Parallel Execution:
+
+- Concurrent execution refers to tasks making progress simultaneously but not necessarily running at the exact same moment. 
+This could happen on a single CPU where tasks are context-switched.
+- Parallel execution refers to tasks running at the same exact time, which requires multiple CPU cores.
+
+Q2. Task Behavior after exceeding budget in 4.4
+
+- When a task exceeds its allocated budget of execution time per period, the kernel logs a message indicating a budget overrun. 
+This message includes the task ID and the utilization percentage exceeded.
+
+- In 4.5, the kernel sends a SIGUSR1 signal to notify the task that it has exceeded its budget, allowing it to take appropriate action in user space.
+
+Q3. If a deadline of a periodic task is different with its period, how do you implement to support real-time
+
+- If the task's deadline is different from its period, implement a modified Rate Monotonic or Deadline scheduling policy. 
+This involves setting the deadline constraint explicitly within the kernel using sched_attr and adapting the periodic timer to monitor both period and deadline separately.
+
+Q3. Challenges we faced and solutions: 
+
+- During the implementation of Sections 4.1 to 4.5, we encountered several challenges that required careful adjustments. One significant issue was related to loop variable declarations in syscalls.c, which caused compile errors due to the kernel not supporting C99-style loop declarations by default. To resolve this, we updated the code to use older-style loop variable declarations that complied with the kernel's C standard.
+Additionally, our user-space test application (test_rsv) initially produced no output, which was due to incorrect cross-compilation. We fixed this by ensuring that the executable was properly cross-compiled for the Raspberry Pi environment. Finally, we faced conflicting types in the syscall declarations between syscalls.h and syscalls.c, which caused compilation errors. We resolved this by standardizing all syscall declarations to use consistent return types (asmlinkage long).
