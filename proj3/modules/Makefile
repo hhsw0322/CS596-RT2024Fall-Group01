@@ -1,14 +1,6 @@
-# Specify the architecture and cross-compiler prefix for Raspberry Pi
-ARCH=arm
-CROSS_COMPILE=arm-linux-gnueabihf-
-
-# Define the kernel source path
-KERNEL_SRC=~/Downloads/cs596-rpi-kernel-main
-
-# Default target to build the module
+obj-m += rsv_modules.o
 all:
-	$(MAKE) -C $(KERNEL_SRC) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) M=$(PWD) modules
-
-# Clean target to remove built files
+	make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -C ../../ M=$(PWD) modules
 clean:
-	$(MAKE) -C $(KERNEL_SRC) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) M=$(PWD) clean
+	make -C ../.. M=$(PWD) clean
+

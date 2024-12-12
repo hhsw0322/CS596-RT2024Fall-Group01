@@ -51,5 +51,4 @@
  */
 #define __IGNORE_fadvise64_64
 #define __IGNORE_migrate_pages
-
 #endif /* __ASM_ARM_UNISTD_H */

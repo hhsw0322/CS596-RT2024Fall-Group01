@@ -1977,6 +1977,7 @@ struct task_struct {
 	bool rsv_set; /* Is reservation set */
 	struct timespec rsv_budget;  /* Reservation budget (C) */
 	struct timespec rsv_consumed; /*Accumulator for computation time */
+	struct timespec last_switch_time; /*Time of the last context switch*/
 /* until here */
 /* CPU-specific state of this task */
 	struct thread_struct thread;

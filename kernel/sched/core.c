@@ -59,7 +59,7 @@
 #include <linux/seq_file.h>
 #include <linux/sysctl.h>
 #include <linux/syscalls.h>
-#include <linux/times.h>
+#include <linux/time.h>
 #include <linux/tsacct_kern.h>
 #include <linux/kprobes.h>
 #include <linux/delayacct.h>
@@ -2863,7 +2863,7 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	       struct task_struct *next, struct pin_cookie cookie)
 {
 	struct mm_struct *mm, *oldmm;
-	struct timespect current_time, delta_time;
+	struct timespec current_time, delta_time;
 
 /*Project 3! Step 1: Track time for the current (prev) task before switching out */
 	if (prev->rsv_set) {
