@@ -248,3 +248,7 @@ asmlinkage long sys_cancel_rsv(pid_t pid) {
     put_task_struct(task);
     return -EINVAL; // Task did not have a reservation
 }
+
+EXPORT_SYMBOL(sys_set_rsv);
+EXPORT_SYMBOL(sys_cancel_rsv);
+EXPORT_SYMBOL(sys_wait_until_next_period);
