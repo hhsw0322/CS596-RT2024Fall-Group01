@@ -7,7 +7,7 @@ SRC = test_rsv.c  # Source file
 all: $(TARGET)
 
 $(TARGET): $(SRC)
-	$(CC) -o $(TARGET) $(SRC)
+	$(CC) -o $(TARGET) $(SRC) -no-pie
 
 clean:
 	rm -f $(TARGET)

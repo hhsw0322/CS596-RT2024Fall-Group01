@@ -1,2 +1,0 @@
-# Compile rsv_module.c into a kernel module
-obj-m += rsv_module.o

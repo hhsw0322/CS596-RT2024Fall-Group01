@@ -27,7 +27,9 @@ struct rsv_task_info {
  */
 static enum hrtimer_restart period_timer_callback(struct hrtimer *timer) {
     struct rsv_task_info *info = container_of(timer, struct rsv_task_info, period_timer);
-    
+
+    printk(KERN_ALERT "Timer fired for task %d\n", info->task->pid);
+
     // Check if task has exceeded its budget
     if (timespec_compare(&info->consumed_time, &info->task->rsv_budget) > 0) {
         // Calculate utilization as a percentage
@@ -46,51 +48,12 @@ static enum hrtimer_restart period_timer_callback(struct hrtimer *timer) {
     info->consumed_time.tv_sec = 0;
     info->consumed_time.tv_nsec = 0;
 
+    // Wake up the sleeping task explicitly
+    wake_up_process(info->task);
+
     // Restart the timer for the next period
     hrtimer_forward_now(timer, timespec_to_ktime(info->period));
     return HRTIMER_RESTART;
-}
-
-/*
- * Helper function to compute and set real-time priorities for tasks with reservations.
- */
-void compute_and_set_priorities(void) {
-    struct rsv_task_info *entry;
-    struct rsv_task_info *task_array[50]; // Assumption: max 50 tasks
-    int i = 0, j, k, priority = MAX_RT_PRIO - 1;
-
-    // Collect tasks with reservations into an array for sorting
-    list_for_each_entry(entry, &rsv_task_list, list) {
-        task_array[i++] = entry;
-    }
-
-    // Sort tasks based on their period in ascending order (shorter period = higher priority)
-    for (j = 0; j < i - 1; j++) {
-        for (k = j + 1; k < i; k++) {
-            if (timespec_compare(&task_array[j]->period, &task_array[k]->period) > 0) {
-                struct rsv_task_info *tmp = task_array[j];
-                task_array[j] = task_array[k];
-                task_array[k] = tmp;
-            }
-        }
-    }
-
-    // Assign priorities using SCHED_FIFO
-    for (j = 0; j < i; j++) {
-        struct sched_param param;
-        param.sched_priority = priority;
-        sched_setscheduler(task_array[j]->task, SCHED_FIFO, &param);
-
-        // If the next task has the same period, keep the same priority
-        if (j < i - 1 && timespec_compare(&task_array[j]->period, &task_array[j + 1]->period) != 0) {
-            priority--;
-        }
-
-        // Ensure priority doesn't go below minimum RT priority
-        if (priority < 1) {
-            priority = 1;
-        }
-    }
 }
 
 /*
@@ -159,14 +122,9 @@ asmlinkage long sys_set_rsv(pid_t pid, struct timespec __user *C, struct timespe
     // Start the high-resolution timer for the reservation period
     hrtimer_start(&new_rsv_info->period_timer, timespec_to_ktime(t_val), HRTIMER_MODE_REL);
 
-    // Recalculate and set priorities for all tasks with reservations
-    compute_and_set_priorities();
-
-    spin_unlock(&rsv_lock);
-
-    // Log a message to the kernel
     printk(KERN_ALERT "Reservation set for task %d\n", task->pid);
 
+    spin_unlock(&rsv_lock);
     put_task_struct(task);
     return 0; // Success
 }
@@ -181,9 +139,10 @@ asmlinkage long sys_wait_until_next_period(void) {
     spin_lock(&rsv_lock);
     list_for_each_entry(entry, &rsv_task_list, list) {
         if (entry->task == task) {
+            printk(KERN_ALERT "Task %d is waiting for next period\n", task->pid);
             set_current_state(TASK_UNINTERRUPTIBLE);
             spin_unlock(&rsv_lock);
-            schedule();
+            schedule(); // Sleep until explicitly woken up
             return 0;
         }
     }
@@ -212,43 +171,24 @@ asmlinkage long sys_cancel_rsv(pid_t pid) {
         rcu_read_unlock();
     }
 
-    // Check if the task has a reservation
-    if (!task->rsv_set) {
-        put_task_struct(task);
-        return -EINVAL; // No reservation to cancel
-    }
-
     spin_lock(&rsv_lock);
 
-    // Find and remove task from reservation list
     list_for_each_entry_safe(entry, tmp, &rsv_task_list, list) {
         if (entry->task == task) {
             list_del(&entry->list);
             hrtimer_cancel(&entry->period_timer);
             kfree(entry);
 
-            // Cancel the reservation
             task->rsv_set = false;
-
-            // Recalculate priorities for remaining tasks
-            compute_and_set_priorities();
-
             spin_unlock(&rsv_lock);
 
-            // Log a message to the kernel
             printk(KERN_ALERT "Reservation canceled for task %d\n", task->pid);
-
             put_task_struct(task);
             return 0; // Success
         }
     }
 
     spin_unlock(&rsv_lock);
-
     put_task_struct(task);
     return -EINVAL; // Task did not have a reservation
 }
-
-EXPORT_SYMBOL(sys_set_rsv);
-EXPORT_SYMBOL(sys_cancel_rsv);
-EXPORT_SYMBOL(sys_wait_until_next_period);
